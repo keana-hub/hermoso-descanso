@@ -9,10 +9,15 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-db";
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
+
+const MONGODB_URI = process.env.MONGODB_URI || (process.env.NODE_ENV === "production" ? null : "mongodb://localhost:27017/hotel-db");
+if (!MONGODB_URI) {
+  console.error("MONGODB_URI is required in production. Set the MONGODB_URI environment variable.");
+  process.exit(1);
+}
 
 let transporter = null;
 if (EMAIL_USER && EMAIL_PASS) {
@@ -236,7 +241,7 @@ app.post("/api/logout", authMiddleware, async (req, res) => {
   res.json({ message: "Logged out" });
 });
 
-app.post("/api/attendance", async (req, res) => {
+app.post("/api/attendance", authMiddleware, async (req, res) => {
   const { name, role, event } = req.body;
   if (!name || !role || !event) {
     return res.status(400).json({ message: "Name, role and event type are required" });
