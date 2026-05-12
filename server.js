@@ -35,15 +35,24 @@ app.use(express.static("public"));
 console.log("Attempting to connect to MongoDB at:", MONGODB_URI);
 mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-  .then(() => {
+  .then(async () => {
     console.log("Connected to MongoDB");
-    seedDatabase().catch(err => console.error("Seed error:", err));
-    // Update inventory categories to include "Kitchen" prefix for ingredients
-    updateInventoryCategories().catch(err => console.error("Category update error:", err));
+    try {
+      await seedDatabase();
+    } catch (err) {
+      console.error("Seed error:", err);
+    }
+
+    try {
+      await updateInventoryCategories();
+    } catch (err) {
+      console.error("Category update error:", err);
+    }
+
+    startServer();
   })
   .catch((err) => {
     console.warn("MongoDB connection failed. Running in offline mode:", err.message);
-    // Start server anyway in offline mode
     startServer();
   });
 
@@ -819,9 +828,6 @@ function startServer() {
     process.exit(1);
   });
 }
-
-// Start server immediately (MongoDB will connect in background if available)
-startServer();
 
 async function seedDatabase() {
   await User.updateOne({ username: "123admin" }, { username: "123admin", password: "password765", role: "admin" }, { upsert: true });
