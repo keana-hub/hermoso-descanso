@@ -14,13 +14,18 @@ const JWT_SECRET = process.env.JWT_SECRET || "secret";
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
-});
+let transporter = null;
+if (EMAIL_USER && EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+  });
+} else {
+  console.warn("EMAIL_USER or EMAIL_PASS not set; booking confirmation emails will be disabled.");
+}
 
 app.use(cors());
 app.use(express.json());
@@ -424,33 +429,37 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     { status: "Occupied", housekeepingStatus: "Pending" }
   );
 
-  // Send confirmation email
-  const mailOptions = {
-    from: EMAIL_USER,
-    to: email,
-    subject: "Reservation Confirmation - Hermoso Descanso",
-    html: `
-      <h2>Reservation Confirmed</h2>
-      <p>Dear ${guestName},</p>
-      <p>Your reservation has been confirmed:</p>
-      <ul>
-        <li>Room: ${roomId}</li>
-        <li>Check-in: ${new Date(checkIn).toLocaleDateString()}</li>
-        <li>Check-out: ${new Date(checkOut).toLocaleDateString()}</li>
-        <li>Payment Method: ${paymentMethod}</li>
-        <li>Contact: ${contact}</li>
-      </ul>
-      <p>Thank you for choosing Hermoso Descanso!</p>
-    `,
-  };
+  // Send confirmation email if configured
+  if (transporter) {
+    const mailOptions = {
+      from: EMAIL_USER,
+      to: email,
+      subject: "Reservation Confirmation - Hermoso Descanso",
+      html: `
+        <h2>Reservation Confirmed</h2>
+        <p>Dear ${guestName},</p>
+        <p>Your reservation has been confirmed:</p>
+        <ul>
+          <li>Room: ${roomId}</li>
+          <li>Check-in: ${new Date(checkIn).toLocaleDateString()}</li>
+          <li>Check-out: ${new Date(checkOut).toLocaleDateString()}</li>
+          <li>Payment Method: ${paymentMethod}</li>
+          <li>Contact: ${contact}</li>
+        </ul>
+        <p>Thank you for choosing Hermoso Descanso!</p>
+      `,
+    };
 
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.log("Email error:", error);
-    } else {
-      console.log("Email sent:", info.response);
-    }
-  });
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log("Email error:", error);
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
+  } else {
+    console.log("Email not sent: EMAIL_USER/EMAIL_PASS not configured.");
+  }
 
   res.status(201).json(booking);
 });
@@ -797,8 +806,17 @@ async function updateInventoryCategories() {
 }
 
 function startServer() {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`Port ${PORT} is already in use. Please stop the process using that port or set a different PORT.`);
+    } else {
+      console.error("Server error:", err);
+    }
+    process.exit(1);
   });
 }
 
