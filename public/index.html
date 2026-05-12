@@ -196,15 +196,38 @@
     <div id="root"><p style="margin: 20px; color: #666;">Loading application...</p></div>
     <script>
       console.log("HTML loaded, waiting for React libraries...");
+      window.appLoadTimeout = setTimeout(() => {
+        if (!window.React || !window.ReactDOM) {
+          const root = document.getElementById("root");
+          root.innerHTML = `<div style="margin: 20px; padding: 20px; background: #fee; border: 1px solid #f99; border-radius: 8px;">
+            <h3 style="color: #c33;">Failed to Load Application</h3>
+            <p>The application failed to load. This could be due to:</p>
+            <ul>
+              <li>Slow or no internet connection</li>
+              <li>CDN unreachable</li>
+              <li>Browser cache issues</li>
+            </ul>
+            <p>Try refreshing the page or clearing your browser cache.</p>
+            <p style="font-size: 0.9em; color: #666; margin-top: 20px;">
+              Debug: React=${typeof window.React}, ReactDOM=${typeof window.ReactDOM}
+            </p>
+          </div>`;
+        }
+      }, 5000);
     </script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin onerror="console.error('Failed to load React')"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin onerror="console.error('Failed to load ReactDOM')"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" onerror="console.error('Failed to load Babel')"></script>
     <script>
+      clearTimeout(window.appLoadTimeout);
       console.log("React libraries loaded");
       console.log("React:", typeof React);
       console.log("ReactDOM:", typeof ReactDOM);
+      if (!window.React) {
+        console.error("React failed to load!");
+        document.getElementById("root").innerHTML = "<p style='color:red; margin: 20px;'>ERROR: React library failed to load. Try refreshing.</p>";
+      }
     </script>
-    <script type="text/babel" src="app.js"></script>
+    <script type="text/babel" src="app.js" onerror="console.error('Failed to load app.js')"></script>
   </body>
 </html>

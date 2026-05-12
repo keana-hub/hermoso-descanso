@@ -1,5 +1,7 @@
 const { useState, useEffect } = React;
-const API = "/api";
+const API = window.location.origin + "/api"; // Dynamically use current domain
+
+console.log("API endpoint:", API);
 
 function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
