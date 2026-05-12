@@ -19,6 +19,25 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
+// Track database connection status
+let isDatabaseConnected = false;
+
+// Monitor database connection
+mongoose.connection.on('connected', () => {
+  console.log('MongoDB connected');
+  isDatabaseConnected = true;
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err);
+  isDatabaseConnected = false;
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected');
+  isDatabaseConnected = false;
+});
+
 let transporter = null;
 if (EMAIL_USER && EMAIL_PASS) {
   transporter = nodemailer.createTransport({
@@ -36,12 +55,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    database: isDatabaseConnected ? "connected" : "disconnected",
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB at:", MONGODB_URI);
 mongoose
   .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
     console.log("Connected to MongoDB");
+    isDatabaseConnected = true;
     try {
       await seedDatabase();
     } catch (err) {
@@ -58,6 +87,7 @@ mongoose
   })
   .catch((err) => {
     console.warn("MongoDB connection failed. Running in offline mode:", err.message);
+    isDatabaseConnected = false;
     startServer();
   });
 
@@ -210,27 +240,37 @@ app.post("/api/login", async (req, res) => {
     return res.status(400).json({ message: "Username and password are required" });
   }
 
-  const user = await User.findOne({ username, password }).lean();
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials" });
+  // Check if database is connected
+  if (!isDatabaseConnected) {
+    return res.status(503).json({ message: "Database connection unavailable. Please try again later." });
   }
 
-  const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: "8h" });
+  try {
+    const user = await User.findOne({ username, password }).lean();
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-  // Log login
-  LoginLog.create({
-    username,
-    role: user.role,
-    loginTime: new Date(),
-  }).catch(() => null);
+    const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: "8h" });
 
-  Attendance.create({
-    name: username,
-    role: user.role,
-    event: "Login",
-  }).catch(() => null);
+    // Log login
+    LoginLog.create({
+      username,
+      role: user.role,
+      loginTime: new Date(),
+    }).catch(() => null);
 
-  res.json({ token, role: user.role, username });
+    Attendance.create({
+      name: username,
+      role: user.role,
+      event: "Login",
+    }).catch(() => null);
+
+    res.json({ token, role: user.role, username });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ message: "Login failed due to server error" });
+  }
 });
 
 app.post("/api/logout", authMiddleware, async (req, res) => {
