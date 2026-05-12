@@ -67,7 +67,11 @@ app.get("/api/health", (req, res) => {
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB at:", MONGODB_URI);
 mongoose
-  .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
+  .connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000,
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(async () => {
     console.log("Connected to MongoDB");
     isDatabaseConnected = true;
@@ -87,7 +91,12 @@ mongoose
   })
   .catch((err) => {
     console.warn("MongoDB connection failed. Running in offline mode:", err.message);
+    console.error(err);
     isDatabaseConnected = false;
+    if (process.env.NODE_ENV === "production") {
+      console.error("Production MongoDB connection failed. Exiting to allow platform restart.");
+      process.exit(1);
+    }
     startServer();
   });
 
