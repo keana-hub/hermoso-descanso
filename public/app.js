@@ -7,15 +7,25 @@ function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+async function parseJsonSafe(response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    return null;
+  }
+}
+
 async function fetchApi(endpoint, token) {
   const response = await fetch(`${API}${endpoint}`, {
     headers: authHeaders(token),
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Failed to fetch ${endpoint}`);
+    const error = await parseJsonSafe(response);
+    throw new Error(error?.message || `Failed to fetch ${endpoint}`);
   }
-  return response.json();
+  return parseJsonSafe(response);
 }
 
 const kitchenMenu = [
@@ -1406,7 +1416,10 @@ function POSSystem({ token }) {
       });
       
       if (response.ok) {
-        const order = await response.json();
+        const order = await parseJsonSafe(response);
+        if (!order || !order._id) {
+          throw new Error("Invalid order response from server");
+        }
         const receiptResponse = await fetch(`${API}/pos/orders/${order._id}/receipt`, { headers: authHeaders(token) });
         const receiptText = await receiptResponse.text();
         const blob = new Blob([receiptText], { type: "text/plain" });
@@ -1600,11 +1613,14 @@ function App() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Login failed");
+        const data = await parseJsonSafe(response);
+        throw new Error(data?.message || "Login failed");
       }
 
-      const data = await response.json();
+      const data = await parseJsonSafe(response);
+      if (!data || !data.token) {
+        throw new Error("Login failed: invalid server response");
+      }
       const rawToken = data.token.replace(/^Bearer\s+/i, "");
       localStorage.setItem("token", rawToken);
       localStorage.setItem("role", data.role);
