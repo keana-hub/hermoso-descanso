@@ -52,8 +52,26 @@ A full-stack hotel management system built with Node.js, Express, React, and Mon
 
 1. Sign up at https://www.mongodb.com/atlas
 2. Create a free cluster
-3. Get your connection string
-4. Update `MONGODB_URI` in your `.env` file
+3. Create a database user and copy the connection string
+4. **Important**: URL-encode special characters in your password (like `:` becomes `%3A`)
+5. Add your database name to the end of the URI: `/hotel-db`
+6. Update `MONGODB_URI` in your `.env` file
+
+**Example URI format:**
+```env
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/hotel-db
+```
+
+**If your password contains special characters:**
+- `:` becomes `%3A`
+- `@` becomes `%40`
+- `/` becomes `%2F`
+- etc.
+
+**Example with encoded password:**
+```env
+MONGODB_URI=mongodb+srv://user:pass%3Aword@cluster.mongodb.net/hotel-db
+```
 
 ### 2. Choose a Hosting Platform
 
